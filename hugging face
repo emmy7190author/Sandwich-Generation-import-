@@ -1,0 +1,64 @@
+name: Import: Hugging Face Space
+
+on:
+  workflow_dispatch:
+    inputs:
+      hf_space:
+        description: 'Hugging Face space (owner/space) to import, e.g. emmy7190/the-sandwich-sage-care-cash-harmony-guide'
+        required: true
+        default: 'emmy7190/the-sandwich-sage-care-cash-harmony-guide'
+      target_branch:
+        description: 'Target branch to push the imported files into'
+        required: true
+        default: 'import/hf-space'
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install git-lfs
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git-lfs
+          git lfs install
+
+      - name: Clone Hugging Face Space
+        run: |
+          set -e
+          echo "Cloning https://huggingface.co/spaces/${{ github.event.inputs.hf_space }}"
+          git clone https://huggingface.co/spaces/${{ github.event.inputs.hf_space }} hf-space-temp
+
+      - name: Prepare import directory
+        run: |
+          rm -rf hf-import || true
+          mkdir -p hf-import
+          rsync -a --exclude='.git' hf-space-temp/ hf-import/
+          ls -la hf-import | sed -n '1,200p'
+
+      - name: Commit and push to target branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # create or switch to target branch
+          if git rev-parse --verify origin/${{ github.event.inputs.target_branch }} >/dev/null 2>&1; then
+            git fetch origin ${{ github.event.inputs.target_branch }}:refs/remotes/origin/${{ github.event.inputs.target_branch }}
+            git checkout -B ${{ github.event.inputs.target_branch }}
+          else
+            git checkout -b ${{ github.event.inputs.target_branch }}
+          fi
+          rsync -a --delete hf-import/ .
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Import Hugging Face Space: ${{ github.event.inputs.hf_space }}"
+          git push --set-upstream origin HEAD
