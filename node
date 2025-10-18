@@ -1,0 +1,12 @@
+# Node modules
+node_modules/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Hugging Face cache
+cache/
+
+# macOS
+.DS_Store
